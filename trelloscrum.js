@@ -95,12 +95,13 @@ $(function(){
 
 	(function read(){
 		readList($('.list'));
+		computeTotal();
 		$(document).one('DOMNodeInserted', '.list',read);	
 	})();
 	// $(document).one('DOMNodeInserted', '.list', read);
 
 	// console.log($('.list').length);
-	// setTimeout(function(){readList($('.list'))}, 5000);;
+	// setTimeout(function(){readList($('.list')); computeTotal();}, 5000);;
 });
 
 //.list pseudo
@@ -120,12 +121,12 @@ function List(el){
 				})
 			}).appendTo($list.find('.list-header h2'));
 
-	// $list.bind('DOMNodeInserted',function(e){
-	// 	if($(e.target).hasClass('list-card') && !e.target.listCard) {
-	// 		clearTimeout(to2);
-	// 		to2=setTimeout(readCard,0,$(e.target))
-	// 	}
-	// });
+	$list.bind('DOMNodeInserted',function(e){
+		if($(e.target).hasClass('list-card') && !e.target.listCard) {
+			clearTimeout(to2);
+			to2=setTimeout(readCard,0,$(e.target))
+		}
+	});
 
 
 	function readCard($c){
