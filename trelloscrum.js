@@ -16,7 +16,7 @@
 */
 
 //default story point picker sequence
-var _pointSeq = ['?', 0, 1, 2, 3, 5, 8, 13, 20];
+var _pointSeq = ['?', 0, 0.1, 0.25, 0.5, 1, 2, 3, 5];
 //attributes representing points values for card
 var _pointsAttr = ['cpoints', 'points'];
 
@@ -93,8 +93,14 @@ $(function(){
 		})
 	};
 
-	readList($('.list'));
+	(function read(){
+		readList($('.list'));
+		$(document).one('DOMNodeInserted', '.list',read);	
+	})();
+	// $(document).one('DOMNodeInserted', '.list', read);
 
+	// console.log($('.list').length);
+	// setTimeout(function(){readList($('.list'))}, 5000);;
 });
 
 //.list pseudo
@@ -107,21 +113,20 @@ function List(el){
 		to,
 		to2;
 
-	var $total=$('<span class="list-total">')
-		.bind('DOMNodeRemovedFromDocument',function(){
-			clearTimeout(to);
-			to=setTimeout(function(){
-				$total.appendTo($list.find('.list-header h2'))
-			})
-		})
-		.appendTo($list.find('.list-header h2'));
+	var $total=$('<span class="list-total">').bind('DOMNodeRemovedFromDocument',function(){
+				clearTimeout(to);
+				to=setTimeout(function(){
+					$total.appendTo($list.find('.list-header h2'))
+				})
+			}).appendTo($list.find('.list-header h2'));
 
-	$list.bind('DOMNodeInserted',function(e){
-		if($(e.target).hasClass('list-card') && !e.target.listCard) {
-			clearTimeout(to2);
-			to2=setTimeout(readCard,0,$(e.target))
-		}
-	});
+	// $list.bind('DOMNodeInserted',function(e){
+	// 	if($(e.target).hasClass('list-card') && !e.target.listCard) {
+	// 		clearTimeout(to2);
+	// 		to2=setTimeout(readCard,0,$(e.target))
+	// 	}
+	// });
+
 
 	function readCard($c){
 		$c.each(function(){
@@ -133,8 +138,10 @@ function List(el){
 				for (var i in _pointsAttr){
 					new ListCard(that, _pointsAttr[i])
 				}
+
 				$(that).bind('DOMNodeInserted',function(e){
-					if(!busy && ($(e.target).hasClass('list-card-title') || e.target==that)) {
+					if (busy){return;}
+					if(($(e.target).hasClass('list-card-title') || e.target==that)) {
 						clearTimeout(to2);
 						to2=setTimeout(function(){
 							busy=true;
@@ -154,7 +161,10 @@ function List(el){
 		for (var i in _pointsAttr){
 			var score=0;
 			var attr = _pointsAttr[i];
-			$list.find('.list-card').each(function(){if(this.listCard && !isNaN(Number(this.listCard[attr].points)))score+=Number(this.listCard[attr].points)});
+			$list.find('.list-card').each(function(){
+				if(this.listCard && !isNaN(Number(this.listCard[attr].points)))
+					score+=Number(this.listCard[attr].points)
+			});
 			var scoreTruncated = Utils.roundValue(score);			
 			$total.append('<span class="'+attr+'">'+(scoreTruncated>0?scoreTruncated:'')+'</span>');
 		}
