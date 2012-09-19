@@ -5,7 +5,8 @@
 	"content_scripts": [
 		{
 			"matches": ["https://trello.com/*"],
-			"js": ["jquery-1.7.1.min.js","trelloscrum.js"],
+			"exclude_matches": ["https://trello.com/1/*"],
+			"js": ["jquery-1.7.1.min.js", "client.js", "trelloscrum.js"],
 			"css": ["trelloscrum.css"]
 		}
 	],
@@ -14,5 +15,10 @@
     "web_accessible_resources": [
 	    "images/storypoints-icon.png",
 	    "images/points-done.png"
-    ]
+    ],
+    "permissions": [
+    	"webRequest", "tabs",
+    	"https://trello.com/",
+    	"https://api.trello.com/*"
+  	]
 }

@@ -19,8 +19,11 @@
 var _pointSeq = ['?', 0, 0.1, 0.25, 0.5, 1, 2, 3, 5];
 //attributes representing points values for card
 var _pointsAttr = ['cpoints', 'points'];
+var TrelloHelper;
 
 
+
+//https://api.trello.com/1/boards/4eda297c53a776a00a443187/cards/21/?fields=name&key=120a6992c5396f169be49006bcc5da00&token=d286d39f7787999171b76871542cd76ce95c52e7ed8d8348dce17c25c333f84b
 //internals
 var filtered = false, //watch for filtered cards
 	reg = /[\(](\x3f|\d*\.?\d+)([\)])\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by ()
@@ -28,74 +31,46 @@ var filtered = false, //watch for filtered cards
 	iconUrl = chrome.extension.getURL('images/storypoints-icon.png'),
 	pointsDoneUrl = chrome.extension.getURL('images/points-done.png');
 
-var Utils = (function(){
-	function _roundValue(_val){
-		return (Math.floor(_val * 100) / 100);
-	}
-	return {
-		roundValue : _roundValue
-	}
-})();
-
 //what to do when DOM loads
 $(function(){
+	TrelloHelper = Helper(document, $);
+	// if (window == top) {
+	//   window.addEventListener("keyup", keyListener, false);
+	// }
+
+	// // Keyboard keyup listener callback.
+	// function keyListener(e) {
+	// // console.log(e.keyCode);	
+	// }
+
 	//watch filtering
 	$('.js-filter-toggle').live('mouseup',function(e){
 		setTimeout(function(){
 			filtered=$('.js-filter-cards').hasClass('is-on');
-			calcPoints()
+			Utils.calcPoints()
 		})
 	});
-
-	//for storypoint picker
-	$(".card-detail-title .edit-controls").live('DOMNodeInserted',showPointPicker);
-	//for done button
-	$(document).on('DOMNodeInserted','.window', showDoneButton);
-
-	$('body').bind('DOMSubtreeModified',function(e){
-		if($(e.target).hasClass('list')){
-			readList($(e.target));
-			computeTotal();
-		}
+	Cards(document, jQuery);
+	
+	
+	$(document).on('DOMNodeInserted', '.list-card-members .member .member-avatar', function(){
+	//	console.log(this);
 	});
+
+	// $('body').bind('DOMSubtreeModified',function(e){
+	// 	if($(e.target).hasClass('list')){
+	// 		readList($(e.target));
+	// 		computeTotal();
+	// 	}
+	// });
 
 	$('.js-share').live('mouseup',function(){
-		setTimeout(checkExport)
+		setTimeout(Utils.checkExport)
 	});
-	
-	function computeTotal(){
-		var $title = $(".board-title");
-		var $total = $(".board-title .list-total");
-		if ($total.length == 0){
-			$total = $("<span class='list-total'>").appendTo($title);
-		}
-		for (var i in _pointsAttr){
-			var score = 0;
-			var attr = _pointsAttr[i];
-			$("#board .list-total ."+attr).each(function(){ 
-				var value = $(this).text();
-				if (value && !isNaN(value)){
-					score+=parseFloat(value);
-				} 
-			});
-			var $countElem = $('.board-title .list-total .'+attr);
-			if ($countElem.length > 0){
-				$countElem.remove();
-			}
-			$total.append("<span class='"+attr+"'>"+Utils.roundValue(score)+"</span>");
-		}
-	}
-
-	function readList($c){
-		$c.each(function(){
-			if(!this.list) new List(this);
-			else if(this.list.calc) this.list.calc();
-		})
-	};
 
 	(function read(){
-		readList($('.list'));
-		computeTotal();
+		Utils.readList($('.list'));
+		Utils.computeTotal();
 		$(document).one('DOMNodeInserted', '.list',read);	
 	})();
 	// $(document).one('DOMNodeInserted', '.list', read);
@@ -226,147 +201,278 @@ function ListCard(el, identifier){
 	this.refresh();
 };
 
-//forcibly calculate list totals
-function calcPoints($el){
-	($el||$('.list')).each(function(){if(this.list)this.list.calc()})
-};
 
-//the story point picker
-function showPointPicker() {
-	if($(this).find('.picker').length) return;
-	var $picker = $('<div class="picker">').appendTo('.card-detail-title .edit-controls');
-	for (var i in _pointSeq) $picker.append($('<span class="point-value">').text(_pointSeq[i]).click(function(){
-		var value = $(this).text();
-		var $text = $('.card-detail-title .edit textarea');
-		var text = $text.val();
+function Helper(_document, jQuery){
+	var key = "key=120a6992c5396f169be49006bcc5da00"; 
+	var token;
+	var trelloApi = "https://api.trello.com/1/";
 
-		// replace our new
-		$text[0].value=text.match(reg)?text.replace(reg, '('+value+') '):'('+value+') ' + text;
-
-		// then click our button so it all gets saved away
-		$(".card-detail-title .edit .js-save-edit").click();
-
-		return false
-	}))
-};
-
-function showDoneButton(){
-	function checkIfDone(){
-		var text = $('.card-detail-title.editable .window-title-text').text();
-		var match = text.match(regC);
-		if (match){
-			$(".js-points-done").addClass('is-on');
-		}else{
-			$(".js-points-done").removeClass('is-on');
-		}
+	var $ = jQuery;
+	var $status = $("<div id='TrelloScrum' class='off'>");
+	$(_document.body).append($status);
+	//flag as done
+	var setAuthenticated = function(){
+		token = Trello.token();
+		$status.removeClass('off').addClass('on');
 	};
-	//allows to refresh check state on DOMNodeInserted event
-	checkIfDone();
-	if ($(this).find('.js-points-done-sidebar-button').length) return;
-	var $btn = $('<div class="js-points-done-sidebar-button">'+
-					'<a class="button-link js-points-done"><span class="app-icon small-icon points-done-icon" style="background-image: url('+pointsDoneUrl+')"></span> Done '+
-						'<span class="on">'+
-							'<span class="app-icon small-icon light check-icon"></span>'+
-						 '</span> '+
-					'</a> '+
-				  '</div>').prependTo('.window-module.other-actions.clearfix div.clearfix');
 	
-	$btn.on('click', function(){
-		//we toggle the card in edit mode, hacky but required to update values (tends to flashes)
-		var $header = $('.card-detail-title.editable .window-title-text').click();
-		var $text = $('.card-detail-title .edit textarea');
-		var text = $text.val();
-
-		var $jsbtn = $(".js-points-done");
-		var match;
-		if ($jsbtn.hasClass('is-on')){
-			match = text.match(regC);
-			if (match){
-				$text.val(text.replace(regC, '('+match[1]+') '));
-				$jsbtn.removeClass('is-on');
-			}	
-		}else{
-			match = text.match(reg);
-			if (match){
-				$text.val(text.replace(reg, '['+match[1]+'] '));
-				$jsbtn.addClass('is-on');
-			}
-		}	
-
-		// then click our button so it all gets saved away
-		$(".card-detail-title .edit .js-save-edit").click();
-		return false;
-	});
-}
-
-//for export
-var $excel_btn,$excel_dl;
-window.URL = window.webkitURL || window.URL;
-window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
-
-function checkExport() {
-	if($('form').find('.js-export-excel').length) return;
-	var $js_btn = $('form').find('.js-export-json');
-	if($js_btn.length)
-		$excel_btn = $('<a>')
-			.attr({
-				style: 'margin: 0 4px 4px 0;',
-				class: 'button js-export-excel',
-				href: '#',
-				target: '_blank',
-				title: 'Open downloaded file with Excel'
-			})
-			.text('Excel')
-			.click(showExcelExport)
-			.insertAfter($js_btn);
-}
-
-function showExcelExport() {
-	$excel_btn.text('Generating...');
-
-	$.getJSON($('form').find('.js-export-json').attr('href'), function(data) {
-		var s = '<table id="export" border=1>';
-		s += '<tr><th>Points</th><th>Story</th><th>Description</th></tr>';
-		$.each(data['lists'], function(key, list) {
-			var list_id = list["id"];
-			s += '<tr><th colspan="3">' + list['name'] + '</th></tr>';
-
-			$.each(data["cards"], function(key, card) {
-				if (card["idList"] == list_id) {
-					var title = card["name"];
-					var parsed = title.match(reg);
-					var points = parsed?parsed[1]:'';
-					title = title.replace(reg,'');
-					s += '<tr><td>'+ points + '</td><td>' + title + '</td><td>' + card["desc"] + '</td></tr>';
-				}
+	//action on click
+	var onClickAuthenticate = function(){
+		if (!Trello.authorized()){			
+			Trello.authorize({
+					name: 'TrelloScrum',
+					expiration : 'never',
+					scope : {
+						read:true,
+						write:true
+					},
+		 			type: "popup", 
+		 			success : setAuthenticated
 			});
-			s += '<tr><td colspan=3></td></tr>';
-		});
-		s += '</table>';
-
-		var bb = new BlobBuilder();
-		bb.append(s);
+		}else{
+	 		Trello.deauthorize();
+	 		$status.addClass('off').removeClass('on');
+		}
 		
-		var board_title_reg = /.*\/board\/(.*)\//;
-		var board_title_parsed = document.location.href.match(board_title_reg);
-		var board_title = board_title_parsed[1];
+	}
+	$status.bind('click', onClickAuthenticate);
+	//reauthenticate on page show
+	Trello.authorize({
+		interactive : false,
+		success : setAuthenticated
+	});	
 
-		$excel_btn
-			.text('Excel')
-			.after(
-				$excel_dl=$('<a>')
-					.attr({
-						download: board_title + '.xls',
-						href: window.URL.createObjectURL(bb.getBlob('application/ms-excel'))
-					})
-			);
+	var buildSuffix = function(){
+		return key+"&token="+token;
+	}
 
-		var evt = document.createEvent('MouseEvents');
-		evt.initMouseEvent('click', true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-		$excel_dl[0].dispatchEvent(evt);
-		$excel_dl.remove()
+	return {
+		ready : Trello.authorized,
+		trelloApi : "https://api.trello.com/1/",
+		urlSuffix : buildSuffix
 
-	});
-
-	return false
+	};
 };
+
+function Cards(_document, jQuery){
+	var $ = jQuery;
+	//the story point picker
+	function showPointPicker() {
+		//could be improved using the api call
+		if($(this).find('.picker').length) return;
+		var $picker = $('<div class="picker">').appendTo('.card-detail-title .edit-controls');
+		for (var i in _pointSeq) $picker.append($('<span class="point-value">').text(_pointSeq[i]).click(function(){
+			var value = $(this).text();
+			var $text = $('.card-detail-title .edit textarea');
+			var text = $text.val();
+
+			// replace our new
+			$text[0].value=text.match(reg)?text.replace(reg, '('+value+') '):'('+value+') ' + text;
+
+			// then click our button so it all gets saved away
+			$(".card-detail-title .edit .js-save-edit").click();
+
+			return false
+		}))
+	};
+
+	function showDoneButton(){
+		function checkIfDone(){
+			var text = $('.card-detail-title.editable .window-title-text').text();
+			var match = text.match(regC);
+			if (match){
+				$(".js-points-done").addClass('is-on');
+			}else{
+				$(".js-points-done").removeClass('is-on');
+			}
+		};
+		//allows to refresh check state on DOMNodeInserted event
+		checkIfDone();
+		if (!TrelloHelper.ready() || $(this).find('.js-points-done-sidebar-button').length) return;
+		var $btn = $('<div class="js-points-done-sidebar-button">'+
+						'<a class="button-link js-points-done"><span class="app-icon small-icon points-done-icon" style="background-image: url('+pointsDoneUrl+')"></span> Done '+
+							'<span class="on">'+
+								'<span class="app-icon small-icon light check-icon"></span>'+
+							 '</span> '+
+						'</a> '+
+					  '</div>').prependTo('.window-module.other-actions.clearfix div.clearfix');
+		
+		$btn.on('click', function(){
+			//TODO plugin api authentication confirmation
+			var currentURL = window.location.href;
+			var lastSlash =  currentURL.lastIndexOf("/");
+			var cardId = currentURL.substring(lastSlash+1);
+			var boardId = currentURL.substring(currentURL.lastIndexOf("/", lastSlash-1)+1, lastSlash);
+			$.ajax({
+				url: TrelloHelper.trelloApi + 'boards/'+boardId+'/cards/'+cardId+'/?fields=name&'+TrelloHelper.urlSuffix(),
+				success: function(d){				
+					var text = d['name'];
+
+					var $jsbtn = $(".js-points-done");
+					var match;
+					var flaggedAsDone = false;
+					if ($jsbtn.hasClass('is-on')){
+						match = text.match(regC);
+						if (match){
+							text = text.replace(regC, '('+match[1]+') ');
+						}	
+					}else{
+						match = text.match(reg);
+						if (match){
+							text = text.replace(reg, '['+match[1]+'] ');
+							flaggedAsDone = true;
+						}
+					}	
+					
+					var apiToCall = TrelloHelper.trelloApi + 'cards/'+d['id']+'/?name='+text+'&'+TrelloHelper.urlSuffix();
+					if (flaggedAsDone){
+						apiToCall+="&pos=bottom";
+					}else{
+						apiToCall+="&pos=top";
+					}
+					$.ajax({
+						url: apiToCall,
+						success: function(d1){
+							$jsbtn.addClass('is-on', flaggedAsDone);
+						},
+						error: function(e){
+							console.log(e);
+						},
+						type:'put'
+
+					})
+				}
+			})
+
+			return false;
+		});
+	}
+
+	//for storypoint picker
+	$(".card-detail-title .edit-controls").live('DOMNodeInserted',showPointPicker);
+	//for done button
+	$(_document).on('DOMNodeInserted','.window', showDoneButton);
+};
+
+var Utils = (function(){
+//for export
+	var $excel_btn,$excel_dl;
+	window.URL = window.webkitURL || window.URL;
+	window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
+
+
+	function showExcelExport() {
+		$excel_btn.text('Generating...');
+
+		$.getJSON($('form').find('.js-export-json').attr('href'), function(data) {
+			var s = '<table id="export" border=1>';
+			s += '<tr><th>Points</th><th>Story</th><th>Description</th></tr>';
+			$.each(data['lists'], function(key, list) {
+				var list_id = list["id"];
+				s += '<tr><th colspan="3">' + list['name'] + '</th></tr>';
+
+				$.each(data["cards"], function(key, card) {
+					if (card["idList"] == list_id) {
+						var title = card["name"];
+						var parsed = title.match(reg);
+						var points = parsed?parsed[1]:'';
+						title = title.replace(reg,'');
+						s += '<tr><td>'+ points + '</td><td>' + title + '</td><td>' + card["desc"] + '</td></tr>';
+					}
+				});
+				s += '<tr><td colspan=3></td></tr>';
+			});
+			s += '</table>';
+
+			var bb = new BlobBuilder();
+			bb.append(s);
+			
+			var board_title_reg = /.*\/board\/(.*)\//;
+			var board_title_parsed = document.location.href.match(board_title_reg);
+			var board_title = board_title_parsed[1];
+
+			$excel_btn
+				.text('Excel')
+				.after(
+					$excel_dl=$('<a>')
+						.attr({
+							download: board_title + '.xls',
+							href: window.URL.createObjectURL(bb.getBlob('application/ms-excel'))
+						})
+				);
+
+			var evt = document.createEvent('MouseEvents');
+			evt.initMouseEvent('click', true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+			$excel_dl[0].dispatchEvent(evt);
+			$excel_dl.remove()
+		});
+		return false;
+	};
+
+
+	function _roundValue(_val){
+		return (Math.floor(_val * 100) / 100);
+	}
+
+	//forcibly calculate list totals
+	function _calcPoints($el){
+		($el||$('.list')).each(function(){if(this.list)this.list.calc()})
+	};
+
+
+	function _checkExport() {
+		if($('form').find('.js-export-excel').length) return;
+		var $js_btn = $('form').find('.js-export-json');
+		if($js_btn.length)
+			$excel_btn = $('<a>')
+				.attr({
+					style: 'margin: 0 4px 4px 0;',
+					class: 'button js-export-excel',
+					href: '#',
+					target: '_blank',
+					title: 'Open downloaded file with Excel'
+				})
+				.text('Excel')
+				.click(showExcelExport)
+				.insertAfter($js_btn);
+	}
+
+	function _computeTotal(){
+		var $title = $(".board-title");
+		var $total = $(".board-title .list-total");
+		if ($total.length == 0){
+			$total = $("<span class='list-total'>").appendTo($title);
+		}
+		for (var i in _pointsAttr){
+			var score = 0;
+			var attr = _pointsAttr[i];
+			$("#board .list-total ."+attr).each(function(){ 
+				var value = $(this).text();
+				if (value && !isNaN(value)){
+					score+=parseFloat(value);
+				} 
+			});
+			var $countElem = $('.board-title .list-total .'+attr);
+			if ($countElem.length > 0){
+				$countElem.remove();
+			}
+			$total.append("<span class='"+attr+"'>"+Utils.roundValue(score)+"</span>");
+		}
+	}
+
+	function _readList($c){
+		$c.each(function(){
+			if(!this.list) new List(this);
+			else if(this.list.calc) this.list.calc();
+		})
+	};
+
+	return {
+		roundValue : _roundValue,
+		calcPoints : _calcPoints,
+		checkExport : _checkExport,
+		computeTotal: _computeTotal,
+		readList : _readList
+	}
+})();
+

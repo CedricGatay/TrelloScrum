@@ -68,3 +68,26 @@
 .badge-points.consumed{
 	opacity: 0.5;
 }
+
+#TrelloScrum{
+	position:absolute;
+	top:0px;
+	right:0;
+	width:16px;
+	height: 16px;
+	border-radius: 8px;
+	border:1px solid #999;
+}
+
+#TrelloScrum.on{
+	background-color:green;
+}
+
+#TrelloScrum.off{
+	background-color:red;
+}
+
+#TrelloScrum:hover{
+	cursor:pointer;
+	border-color:#ccc;
+}
