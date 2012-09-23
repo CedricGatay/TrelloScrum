@@ -33,7 +33,7 @@ var filtered = false, //watch for filtered cards
 
 //what to do when DOM loads
 $(function(){
-	TrelloHelper = Helper(document, $);
+	TrelloHelper = new Helper(document, $);
 	// if (window == top) {
 	//   window.addEventListener("keyup", keyListener, false);
 	// }
@@ -50,7 +50,7 @@ $(function(){
 			Utils.calcPoints()
 		})
 	});
-	Cards(document, jQuery);
+	new Cards(document, jQuery);
 	
 	
 	$(document).on('DOMNodeInserted', '.list-card-members .member .member-avatar', function(){
@@ -68,12 +68,13 @@ $(function(){
 		setTimeout(Utils.checkExport)
 	});
 
-	(function read(){
+	function read(){
 		Utils.readList($('.list'));
 		Utils.computeTotal();
-		$(document).one('DOMNodeInserted', '.list',read);	
-	})();
+		// $(document).one('DOMNodeInserted', '.list',$.debounce(read, 250));	
+	};
 	// $(document).one('DOMNodeInserted', '.list', read);
+	$(document).on('DOMNodeInserted', '.list',$.throttle(read, 250));	
 
 	// console.log($('.list').length);
 	// setTimeout(function(){readList($('.list')); computeTotal();}, 5000);;
@@ -97,6 +98,8 @@ function List(el){
 			}).appendTo($list.find('.list-header h2'));
 
 	$list.bind('DOMNodeInserted',function(e){
+		// console.log('---');
+		// console.log(e);;
 		if($(e.target).hasClass('list-card') && !e.target.listCard) {
 			clearTimeout(to2);
 			to2=setTimeout(readCard,0,$(e.target))
@@ -114,16 +117,20 @@ function List(el){
 				for (var i in _pointsAttr){
 					new ListCard(that, _pointsAttr[i])
 				}
+				that.updateDisplay();
 
-				$(that).bind('DOMNodeInserted',function(e){
+				$(that).on('DOMNodeInserted','.list-card-title', function(e){
 					if (busy){return;}
-					if(($(e.target).hasClass('list-card-title') || e.target==that)) {
+					//when list-card-title is changed, we get in this too many times, causes flickering
+					if(($(e.target).hasClass('list-card-title'))) {// || e.target==that)) {
+						// console.log(e.target);
 						clearTimeout(to2);
 						to2=setTimeout(function(){
 							busy=true;
-							for (var i in that.listCard){
-								that.listCard[i].refresh();
+							for (var i in _pointsAttr){
+								that.listCard[_pointsAttr[i]].refresh();
 							}
+							that.updateDisplay();
 							busy=false;
 						});
 					}
@@ -141,7 +148,8 @@ function List(el){
 				if(this.listCard && !isNaN(Number(this.listCard[attr].points)))
 					score+=Number(this.listCard[attr].points)
 			});
-			var scoreTruncated = Utils.roundValue(score);			
+			var scoreTruncated = Utils.roundValue(score);	
+			//when moving card, we sometimes add too many times the count		
 			$total.append('<span class="'+attr+'">'+(scoreTruncated>0?scoreTruncated:'')+'</span>');
 		}
 	};
@@ -168,25 +176,29 @@ function ListCard(el, identifier){
 		to,
 		ptitle,
 		$card=$(el),
-		$badge=$('<div class="badge badge-points point-count" style="background-image: url('+iconUrl+')"/>')
-			.bind('DOMSubtreeModified DOMNodeRemovedFromDocument',function(e){
-				if(busy)return;
-				busy=true;
-				clearTimeout(to);
-				to = setTimeout(function(){
-					$badge.prependTo($card.find('.badges'));
-					busy=false;
-				});
-			});
+		$badge=$('<div class="badge badge-points point-count '+identifier+'" style="background-image: url('+iconUrl+')"/>');
+
+	if (!el.updateDisplay){
+		el.updateDisplay = function(){
+			var $title=$card.find('a.list-card-title');
+			if(!$title[0])return;	
+			$title[0].textContent = el.listCard['title'];
+			delete(el.listCard['title']);
+			//clean the attribute to allow next round
+		}
+	}
 
 	this.refresh=function(){
 		var $title=$card.find('a.list-card-title');
 		if(!$title[0])return;
-		var title=$title[0].text;
+		if ($card.find('.badge.badge-points.'+identifier).length == 0){
+			$badge.prependTo($card.find('.badges'));			
+		}
+		var title=el.listCard['title'] || $title[0].text;
 		parsed=title.match(regexp);
 		points=parsed?parsed[1]:-1;
 		if($card.parent()[0]){
-			$title[0].textContent = title.replace(regexp,'');
+			el.listCard['title'] = title.replace(regexp, '');
 			$badge.text(that.points);
 			consumed?$badge.addClass("consumed"):$badge.removeClass('consumed');
 			$badge.attr({title: 'This card has '+that.points+ (consumed?' consumed':'')+' storypoint' + (that.points == 1 ? '.' : 's.')})
