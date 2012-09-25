@@ -34,14 +34,7 @@ var filtered = false, //watch for filtered cards
 //what to do when DOM loads
 $(function(){
 	TrelloHelper = new Helper(document, $);
-	// if (window == top) {
-	//   window.addEventListener("keyup", keyListener, false);
-	// }
-
-	// // Keyboard keyup listener callback.
-	// function keyListener(e) {
-	// // console.log(e.keyCode);	
-	// }
+	
 
 	//watch filtering
 	$('.js-filter-toggle').live('mouseup',function(e){
@@ -53,9 +46,23 @@ $(function(){
 	new Cards(document, jQuery);
 	
 	
-	$(document).on('DOMNodeInserted', '.list-card-members .member .member-avatar', function(){
-	//	console.log(this);
-	});
+	// $("body").on('DOMNodeInserted', '.list-card-members .member .member-avatar', function(){
+	// 	console.log(this);
+	// });
+
+
+	// if (window == top) {
+	//   window.addEventListener("keyup", keyListener, false);
+	// }
+
+	// // // Keyboard keyup listener callback.
+	// function keyListener(e) {
+	// 	switch (e.keyCode){
+	// 		case 32: 
+	// 			setTimeout(function(){console.log($('.active-card')[0])}, 5000);
+	// 			break;
+	// 	}
+	// }
 
 	// $('body').bind('DOMSubtreeModified',function(e){
 	// 	if($(e.target).hasClass('list')){
@@ -68,16 +75,11 @@ $(function(){
 		setTimeout(Utils.checkExport)
 	});
 
-	function read(){
+	(function read(){
 		Utils.readList($('.list'));
 		Utils.computeTotal();
-		// $(document).one('DOMNodeInserted', '.list',$.debounce(read, 250));	
-	};
-	// $(document).one('DOMNodeInserted', '.list', read);
-	$(document).on('DOMNodeInserted', '.list',$.throttle(read, 250));	
-
-	// console.log($('.list').length);
-	// setTimeout(function(){readList($('.list')); computeTotal();}, 5000);;
+		$('body').one('DOMNodeInserted', '.list',$.debounce(read, 250));	
+	})();
 });
 
 //.list pseudo
@@ -98,8 +100,6 @@ function List(el){
 			}).appendTo($list.find('.list-header h2'));
 
 	$list.bind('DOMNodeInserted',function(e){
-		// console.log('---');
-		// console.log(e);;
 		if($(e.target).hasClass('list-card') && !e.target.listCard) {
 			clearTimeout(to2);
 			to2=setTimeout(readCard,0,$(e.target))
@@ -123,7 +123,6 @@ function List(el){
 					if (busy){return;}
 					//when list-card-title is changed, we get in this too many times, causes flickering
 					if(($(e.target).hasClass('list-card-title'))) {// || e.target==that)) {
-						// console.log(e.target);
 						clearTimeout(to2);
 						to2=setTimeout(function(){
 							busy=true;
@@ -132,15 +131,17 @@ function List(el){
 							}
 							that.updateDisplay();
 							busy=false;
-						});
+						}, 250);
 					}
 				});
 			} 
 		})
 	};
 
+	//this method takes time to run
 	this.calc = function(){
-		$total.empty();
+		// $total.empty();
+		var countHTML = "";
 		for (var i in _pointsAttr){
 			var score=0;
 			var attr = _pointsAttr[i];
@@ -150,8 +151,9 @@ function List(el){
 			});
 			var scoreTruncated = Utils.roundValue(score);	
 			//when moving card, we sometimes add too many times the count		
-			$total.append('<span class="'+attr+'">'+(scoreTruncated>0?scoreTruncated:'')+'</span>');
+			countHTML+='<span class="'+attr+'">'+(scoreTruncated>0?scoreTruncated:'')+'</span>';
 		}
+		$total.html(countHTML);
 	};
 
 	readCard($list.find('.list-card'));
@@ -346,9 +348,15 @@ function Cards(_document, jQuery){
 						url: apiToCall,
 						success: function(d1){
 							$jsbtn.addClass('is-on', flaggedAsDone);
+							if (flaggedAsDone){
+								//can't access simple events via 'click()' so we manually close via faking a click
+								var evt = document.createEvent('MouseEvents');
+								evt.initMouseEvent('click', true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+								$(".js-close-window")[0].dispatchEvent(evt);
+							}
 						},
 						error: function(e){
-							console.log(e);
+							console.err(e);
 						},
 						type:'put'
 
