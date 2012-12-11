@@ -1,7 +1,7 @@
 {
 	"name": "Trello Scrum",
-	"version": "1.0.2.2",
-	"description": "Adds Scrum to your Trello, distinct consumed and estimated point counts. Direct button to flag a task as done.",
+	"version": "1.0.2.3",
+	"description": "Adds Scrum to your Trello, distinct consumed and estimated point counts. Direct button to flag a task as done. Updated to work with Trello from Dec 2012",
 	"content_scripts": [
 		{
 			"matches": ["https://trello.com/*"],

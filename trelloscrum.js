@@ -458,8 +458,8 @@ var Utils = (function(){
 	}
 
 	function _computeTotal(){
-		var $title = $(".board-title");
-		var $total = $(".board-title .list-total");
+		var $title = $("#board-header");
+		var $total = $("#board-header .list-total");
 		if ($total.length == 0){
 			$total = $("<span class='list-total'>").appendTo($title);
 		}
@@ -472,7 +472,7 @@ var Utils = (function(){
 					score+=parseFloat(value);
 				} 
 			});
-			var $countElem = $('.board-title .list-total .'+attr);
+			var $countElem = $('#board-header .list-total .'+attr);
 			if ($countElem.length > 0){
 				$countElem.remove();
 			}
